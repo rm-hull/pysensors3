@@ -18,7 +18,7 @@ def main():
                 )
                 for subfeature in feature:
                     print(
-                        '  %s: %.1f' % (    
+                        '  %s: %.1f' % (
                             subfeature.name, subfeature.get_value()
                         )
                     )

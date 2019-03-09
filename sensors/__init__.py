@@ -1,11 +1,17 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 import os
-from ctypes import *
+import sys
+import locale
+
+from ctypes import CDLL, c_char_p, c_int, c_void_p, c_uint, c_double, byref, Structure, get_errno,\
+    POINTER, c_short, c_size_t, create_string_buffer, string_at
 from ctypes.util import find_library
 
 from sensors import stdc
 
+version_info = (0, 1, 0)
+__version__ = '.'.join(map(str, version_info))
 __version__ = '0.1.0'
 __date__ = '2019-03-09'
 __author__ = "Richard Hull / Marc 'BlackJack' Rintsch"
@@ -18,7 +24,7 @@ DEFAULT_CONFIG_FILENAME = '/etc/sensors3.conf'
 LIB_FILENAME = os.environ.get('SENSORS_LIB') or find_library('sensors')
 SENSORS_LIB = CDLL(LIB_FILENAME)
 VERSION = c_char_p.in_dll(SENSORS_LIB, 'libsensors_version').value
-MAJOR_VERSION = int(VERSION.split('.', 1)[0])
+MAJOR_VERSION = version_info[0]
 
 
 class SensorsError(Exception):
@@ -47,7 +53,10 @@ cleanup.restype = None
 
 
 def init(config_filename=DEFAULT_CONFIG_FILENAME):
-    file_p = stdc.fopen(config_filename, 'r')
+    file_p = stdc.fopen(
+        config_filename.encode(sys.getfilesystemencoding()),
+        b'r'
+    )
     if file_p is None:
         error_number = get_errno()
         raise OSError(error_number, os.strerror(error_number), config_filename)
@@ -121,13 +130,13 @@ class Feature(Structure):
         ptr = _get_label(byref(self.chip), byref(self))
         result = string_at(ptr)
         stdc.free(ptr)
-        return result
+        return result.decode(locale.getpreferredencoding())
 
     def get_value(self):
         #
         # TODO Is the first always the correct one for all feature types?
         #
-        return iter(self).next().get_value()
+        return next(iter(self)).get_value()
 
 FEATURE_P = POINTER(Feature)
 
@@ -144,7 +153,7 @@ class Bus(Structure):
     def __str__(self):
         return (
             '*' if self.type == self.TYPE_ANY
-                else _get_adapter_name(byref(self))
+            else _get_adapter_name(byref(self)).decode(locale.getpreferredencoding())
         )
 
     def __repr__(self):
@@ -174,7 +183,7 @@ class Chip(Structure):
     def __new__(cls, *args):
         result = super(Chip, cls).__new__(cls)
         if args:
-            _parse_chip_name(args[0], byref(result))
+            _parse_chip_name(args[0].encode(locale.getpreferredencoding()), byref(result))
         return result
 
     def __init__(self, *_args):
@@ -206,7 +215,7 @@ class Chip(Structure):
         result = create_string_buffer(buffer_size)
         used = _snprintf_chip_name(result, len(result), byref(self))
         assert used < buffer_size
-        return result.value
+        return result.value.decode(locale.getpreferredencoding())
 
     def __iter__(self):
         number = c_int(0)
@@ -280,6 +289,7 @@ _get_all_subfeatures.restype = SUBFEATURE_P
 #
 # TODO sensors_get_subfeature() ?
 #
+
 
 def iter_detected_chips(chip_name='*-*'):
     chip = Chip(chip_name)

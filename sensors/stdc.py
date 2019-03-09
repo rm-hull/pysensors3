@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-from ctypes import *
+from ctypes import CDLL, c_char_p, c_void_p, c_int
 from ctypes.util import find_library
 
 STDC_LIB = CDLL(find_library('c'), use_errno=True)
